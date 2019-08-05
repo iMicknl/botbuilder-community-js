@@ -1,14 +1,15 @@
 /**
- * @module @botbuildercommunity/storage
+ * @module @botbuildercommunity/storage-azure-table
  */
+
 /**
  * Initial code copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License.
  */
-import { Storage, StoreItems, StoreItem } from "botbuilder";
-import * as azure from "azure-storage";
-import { flatten, unflatten } from "flat";
-import { Host } from "botbuilder-azure";
+import { Storage, StoreItems, StoreItem } from 'botbuilder';
+import * as azure from 'azure-storage';
+import { flatten, unflatten } from 'flat';
+import { Host } from 'botbuilder-azure';
 
 const EntityGenerator = azure.TableUtilities.entityGenerator;
 
@@ -38,7 +39,7 @@ export interface TableStorageSettings {
  * @private
  * Map of already initialized tables. Key = tableName, Value = Promise with TableResult creation.
  */
-const checkedTables: { [name: string]: Promise<azure.TableService.TableResult>; } = {};
+const checkedTables: { [name: string]: Promise<azure.TableService.TableResult> } = {};
 
 /**
  * Middleware that implements an Azure Table based storage provider for a bot.
@@ -47,7 +48,7 @@ const checkedTables: { [name: string]: Promise<azure.TableService.TableResult>; 
  * This example shows the typical creation and configuration pattern:
  *
  * ```JavaScript
- * const { TableStorage } = require('botbuilder-azure');
+ * const { AzureTableStorage } = require('@botbuildercommunity/storage-azure-table');
  *
  * const storage = new TableStorage({
  *     storageAccountOrConnectionString: 'UseDevelopmentStorage=true',
@@ -55,7 +56,7 @@ const checkedTables: { [name: string]: Promise<azure.TableService.TableResult>; 
  * });
  * ```
 */
-export class TableStorage implements Storage {
+export class AzureTableStorage implements Storage {
     private settings: TableStorageSettings;
     private tableService: TableServiceAsync;
 
@@ -70,7 +71,7 @@ export class TableStorage implements Storage {
 
         // https://docs.microsoft.com/en-us/rest/api/storageservices/Understanding-the-Table-Service-Data-Model?redirectedfrom=MSDN#table-names
         if (!/^[A-Za-z][A-Za-z0-9]{2,62}$/.test(settings.tableName)) {
-            throw new Error('The table name contains invalid characters.')
+            throw new Error('The table name contains invalid characters.');
         }
 
         this.settings = Object.assign({}, settings);
@@ -111,15 +112,15 @@ export class TableStorage implements Storage {
                     return this.tableService.doesTableExistAsync(this.settings.tableName).then((tableResult: azure.TableService.TableResult) => {
                         if (tableResult.exists) {
                             return this.tableService.retrieveEntityAsync<any>(this.settings.tableName, key, '', { entityResolver: entityResolver })
-                            .then(result => {
-                                let value = unflatten(result, flattenOptions);
-                                value.eTag = value['.metadata'].etag;
+                                .then(result => {
+                                    const value = unflatten(result, flattenOptions);
+                                    value.eTag = value['.metadata'].etag;
 
-                                // remove TableRow Properties from storeItem
-                                ['PartitionKey', 'RowKey', '.metadata'].forEach(k => delete value[k]);
+                                    // remove TableRow Properties from storeItem
+                                    ['PartitionKey', 'RowKey', '.metadata'].forEach(k => delete value[k]);
 
-                                return { key, value };
-                            }).catch(handleNotFoundWith({ key, value: null }));
+                                    return { key, value };
+                                }).catch(handleNotFoundWith({ key, value: null }));
                         } else {
                             // If blob does not exist, return an empty StoreItem.
                             return { } as StoreItem;
@@ -128,7 +129,7 @@ export class TableStorage implements Storage {
                 })).then((items: StoreItem[]) => {
                     if (items !== null && items.length > 0) {
                         const storeItems: StoreItems = items.filter(prop => (<any>prop).value !== null)
-                            .map((propValue: { key, value }) => ({...propValue, key: unSanitizeKey(propValue.key)}))
+                            .map((propValue: { key; value }) => ({...propValue, key: unSanitizeKey(propValue.key)}))
                             .reduce(propsReducer, {});
                         resolve(storeItems);
                     }
@@ -139,33 +140,33 @@ export class TableStorage implements Storage {
 
     public write(changes: StoreItems): Promise<void> {
         if (!changes) {
-            throw new Error('Please provide a StoreItems with changes to persist.')
+            throw new Error('Please provide a StoreItems with changes to persist.');
         }
 
         // Check for bogus etags
         Object.keys(changes).map(key => {
-            let eTag = changes[key].eTag;
-            if (eTag != null && eTag.trim() === "") {
+            const eTag = changes[key].eTag;
+            if (eTag != null && eTag.trim() === '') {
                 throw new Error('Etag empty for key ' + key);
             }
         });
 
         return this.ensureTable().then(() => {
-            var writes = Object.keys(changes).map(key => {
-                let storeItem: StoreItem = changes[key];
+            const writes = Object.keys(changes).map(key => {
+                const storeItem: StoreItem = changes[key];
 
                 // flatten the object graph into single columns
-                let flat = flatten(storeItem, flattenOptions);
-                let entity = asEntityDescriptor(flat);
+                const flat = flatten(storeItem, flattenOptions);
+                const entity = asEntityDescriptor(flat);
                 delete entity.eTag;
 
                 // add PK/RK and ETag
-                let pk = sanitizeKey(key);
+                const pk = sanitizeKey(key);
                 entity.PartitionKey = EntityGenerator.String(pk);
                 entity.RowKey = EntityGenerator.String('');
                 entity['.metadata'] = { etag: storeItem.eTag };
 
-                if (storeItem.eTag == null || storeItem.eTag === "*") {
+                if (storeItem.eTag == null || storeItem.eTag === '*') {
                     // if new item or * then insert or replace unconditionaly
                     return this.tableService.insertOrReplaceEntityAsync(this.settings.tableName, entity);
                 }
@@ -178,15 +179,15 @@ export class TableStorage implements Storage {
             return Promise.all(writes)
                 .then(() => { }).catch(err => console.log(err));            // void
         }).catch(e => console.log(e));
-    };
+    }
 
     public delete(keys: string[]): Promise<void> {
         if (!keys || !keys.length) return Promise.resolve();
 
         return this.ensureTable().then(() => {
-            let deletes = keys.map(key => {
-                let pk = sanitizeKey(key);
-                let entity = {
+            const deletes = keys.map(key => {
+                const pk = sanitizeKey(key);
+                const entity = {
                     PartitionKey: EntityGenerator.String(pk),
                     RowKey: EntityGenerator.String('')
                 };
@@ -275,7 +276,7 @@ const asEntityProperty = (value) => {
         case 'date': return EntityGenerator.DateTime(value);
         case 'boolean': return EntityGenerator.Boolean(value);
         case 'number':
-            let maxSafeInt32 = Math.pow(2, 32) - 1;
+            const maxSafeInt32 = Math.pow(2, 32) - 1;
             if (isFloat(value)) return EntityGenerator.Double(value);
             if (Math.abs(value) > maxSafeInt32) return EntityGenerator.Int64(value);
             return EntityGenerator.Int32(value);
@@ -313,13 +314,13 @@ const getEdmValue = (entityValue) => {
     return entityValue.$ === azure.TableUtilities.EdmType.INT64
         ? Number(entityValue._)
         : entityValue._;
-}
+};
 
 /**
  * @private
  * Reduces pairs for key/value into an object (e.g.: StoreItems)
  */
-const propsReducer = (resolved, propValue: { key, value }): any => {
+const propsReducer = (resolved, propValue: { key; value }): any => {
     resolved[propValue.key] = propValue.value;
     return resolved;
 };
@@ -375,7 +376,7 @@ const sanitizeKey = (key: string): string => {
         sb = sb.replace(charInfo.regexp, charInfo.value);
     });
     return sb;
-}
+};
 
 /**
  * @private
@@ -387,7 +388,7 @@ const unSanitizeKey = (key: string): string => {
         result = result.replace(new RegExp(charInfo.value, 'g'), charInfo.char);
     });
     return result;
-}
+};
 
 /**
  * @private
