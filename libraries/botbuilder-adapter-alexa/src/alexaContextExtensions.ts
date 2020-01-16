@@ -1,6 +1,10 @@
 import { RequestEnvelope } from 'ask-sdk-model';
 import { TurnContext } from 'botbuilder';
 
+/**
+ * @module botbuildercommunity/adapter-alexa
+ */
+
 export class AlexaContextExtensions {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -24,9 +28,11 @@ export class AlexaContextExtensions {
         return hasDisplay;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public static deviceHasAudioPlayer(context: TurnContext): boolean {
-        return false;
+        const alexaRequest = this.getAlexaRequestBody(context);
+        const hasAudioPlayer = ('AudioPlayer' in alexaRequest?.context?.System?.device?.supportedInterfaces);
+
+        return hasAudioPlayer;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -34,14 +40,17 @@ export class AlexaContextExtensions {
         return false;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public static getSessionAttributes(context: TurnContext): boolean {
-        return false;
+    public static setSessionAttributes(context: TurnContext, sessionAttributes: {}): void {
+        context.turnState.set('AlexaSessionAttributes', sessionAttributes);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public static setRepromptSpeech(context: TurnContext, message: string): void {
+    public static getSessionAttributes(context: TurnContext): {} {
+        const alexaRequest = this.getAlexaRequestBody(context);
 
+        return alexaRequest?.session?.attributes;
     }
 
+    public static setRepromptSpeech(context: TurnContext, repromptSpeech: string): void {
+        context.turnState.set('AlexaReprompt', repromptSpeech);
+    }
 }

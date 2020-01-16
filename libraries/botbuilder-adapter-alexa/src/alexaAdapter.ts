@@ -1,6 +1,7 @@
-import { Activity, ActivityTypes, BotAdapter, TurnContext, ConversationReference, ResourceResponse, WebRequest, WebResponse, InputHints } from 'botbuilder';
-import { RequestEnvelope, Response, ResponseEnvelope, interfaces as AlexaInterfaces } from 'ask-sdk-model';
-import { escapeXmlCharacters, getLocale, getUserId, getIntentName, getRequestType, createAskSdkError } from 'ask-sdk-core';
+import { createAskSdkError } from 'ask-sdk-core';
+import { AlexaMessageMapper } from './alexaMessageMapper';
+import { Activity, ActivityTypes, BotAdapter, TurnContext, ConversationReference, ResourceResponse, WebRequest, WebResponse } from 'botbuilder';
+import { RequestEnvelope } from 'ask-sdk-model';
 import { SkillRequestSignatureVerifier, TimestampVerifier } from 'ask-sdk-express-adapter';
 
 /**
@@ -12,25 +13,23 @@ import { SkillRequestSignatureVerifier, TimestampVerifier } from 'ask-sdk-expres
  */
 export interface AlexaAdapterSettings {
     /**
-     * 
      * https://developer.amazon.com/en-US/docs/alexa/echo-button-skills/keep-session-open.html
-     * Defaults to true
+     * @default true
      */
     shouldEndSessionByDefault?: boolean;
     /**
-     * 
-     * Defaults to false
+     * @default false
      */
     tryConvertFirstActivityAttachmentToAlexaCard?: boolean;
     /**
      * This prevents a malicious developer from configuring a skill with your endpoint and then using that skill to send requests to your service.
      * https://developer.amazon.com/en-US/docs/alexa/custom-skills/handle-requests-sent-by-alexa.html
-     * Defaults to true
+     * @default true
      */
     validateIncomingAlexaRequests?: boolean;
     /**
-     * 
-     * Defaults to TakeLastActivity
+     * Handle multiple outgoing activities
+     * @default TakeLastActivity
      */
     multipleOutgoingActivitiesPolicy?: AlexaMultipleOutgoingActivitiesPolicies;
 }
@@ -41,24 +40,14 @@ export enum AlexaMultipleOutgoingActivitiesPolicies {
     ConcatenateTextSpeakPropertiesFromAllActivities
 }
 
-export enum AlexaActivityTypes {
-    LaunchRequest = 'LaunchRequest',
-    SessionEndedRequest = 'SessionEndedRequest',
-    IntentRequest = 'IntentRequest'
-}
-
-/**
- * Export XmlCharacters utility
- */
-export { escapeXmlCharacters as EscapeXmlCharacters };
-
 /**
  * Bot Framework Adapter for Alexa
  */
 export class AlexaAdapter extends BotAdapter {
 
+    public static readonly channel: string = 'alexa';
+
     protected readonly settings: AlexaAdapterSettings;
-    protected readonly channel: string = 'alexa';
 
     /**
      * Creates a new AlexaAdapter instance.
@@ -86,6 +75,7 @@ export class AlexaAdapter extends BotAdapter {
     public async sendActivities(context: TurnContext, activities: Partial<Activity>[]): Promise<ResourceResponse[]> {
         const responses: ResourceResponse[] = [];
 
+        //TODO support combining multiple activities 
         for (let i = 0; i < activities.length; i++) {
             const activity: Partial<Activity> = activities[i];
 
@@ -99,9 +89,9 @@ export class AlexaAdapter extends BotAdapter {
                         throw new Error(`AlexaAdapter.sendActivities(): Activity doesn't contain a conversation id.`);
                     }
 
-                    // TODO Use first or last activity only
+                    // TODO Rewrite so we can use multiple activities
                     // eslint-disable-next-line no-case-declarations
-                    this.activityToMessage(activity, context);
+                    AlexaMessageMapper.activityToAlexaResponse(activity, context);
                     responses.push({ id: activity.id });
 
                     break;
@@ -111,123 +101,29 @@ export class AlexaAdapter extends BotAdapter {
             }
         }
 
-        return responses;
-    }
+        // Support multiple activities
+        // Create ResponseEnvelope??
+        if (responses.length > 1) {
+            // Filter out empty ({} responses);
 
-    /**
-     * Transform Bot Framework Activity to a Alexa Response Message.
-     * 
-     * @param activity Activity to transform
-     */
-    protected activityToMessage(activity: Partial<Activity>, context: TurnContext): any {
+            switch (this.settings.multipleOutgoingActivitiesPolicy) {
 
-        // Create response
-        const response: Response = {};
+                case AlexaMultipleOutgoingActivitiesPolicies.TakeFirstActivity:
+                    break;
 
-        // Add SSML or text response
-        if (activity.speak) {
-            if (!activity.speak.startsWith('<speak>') && !activity.speak.endsWith('</speak>')) {
-                activity.speak = `<speak>${ activity.speak }</speak>`;
+                case AlexaMultipleOutgoingActivitiesPolicies.ConcatenateTextSpeakPropertiesFromAllActivities:
+
+                    break;
+
+                case AlexaMultipleOutgoingActivitiesPolicies.TakeLastActivity:
+                    break;
+
+                default:
+                    break;
             }
-
-            response.outputSpeech = {
-                type: 'SSML',
-                ssml: activity.speak
-            };
-        } else {
-            response.outputSpeech = {
-                type: 'PlainText',
-                text: activity.text
-            };
         }
 
-        // TODO: Handle reprompt
-
-        // TODO: Handle cards
-
-        // TODO: Handle attachments
-
-        // TODO: Add sessionAttributes
-
-        // Tranform inputHint to shouldEndSession
-        switch (activity.inputHint) {
-            case InputHints.IgnoringInput:
-                response.shouldEndSession = true;
-                break;
-            case InputHints.ExpectingInput:
-                response.shouldEndSession = false;
-                break;
-            case InputHints.AcceptingInput:
-            default:
-                break;
-        }
-
-        // Create response
-        const responseEnvelope: ResponseEnvelope = {
-            version: '1.0',
-            response
-        };
-
-        context.turnState.set('httpBody', responseEnvelope);
-
-        return;
-    }
-
-    protected requestToActivity(alexaRequestBody: RequestEnvelope): Partial<Activity> {
-
-        const message = alexaRequestBody.request;
-        const system: AlexaInterfaces.system.SystemState = alexaRequestBody.context.System;
-
-        // Handle events
-        const activity: Partial<Activity> = {
-            id: message.requestId,
-            timestamp: new Date(message.timestamp),
-            channelId: this.channel,
-            conversation: {
-                id: alexaRequestBody.session.sessionId,
-                isGroup: false,
-                conversationType: message.type,
-                tenantId: null,
-                name: ''
-            },
-            from: {
-                id: getUserId(alexaRequestBody),
-                name: 'skill'
-            },
-            recipient: {
-                id: system.application.applicationId,
-                name: 'user'
-            },
-            locale: getLocale(alexaRequestBody),
-            text: message.type === AlexaActivityTypes.IntentRequest ? getIntentName(alexaRequestBody) : '',
-            channelData: alexaRequestBody,
-            localTimezone: null,
-            callerId: null,
-            serviceUrl: `${ system.apiEndpoint }?token=${ system.apiAccessToken }`,
-            listenFor: null,
-            label: null,
-            valueType: null,
-            type: getRequestType(alexaRequestBody)
-        };
-
-        // Set Activity Type
-        switch (message.type) {
-
-            case AlexaActivityTypes.LaunchRequest:
-                activity.type = ActivityTypes.ConversationUpdate;
-                break;
-
-            case AlexaActivityTypes.SessionEndedRequest:
-                activity.type = ActivityTypes.EndOfConversation;
-                break;
-
-            case AlexaActivityTypes.IntentRequest:
-                activity.type = ActivityTypes.Message;
-                break;
-
-        }
-
-        return activity;
+        return responses;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -240,9 +136,16 @@ export class AlexaAdapter extends BotAdapter {
         throw new Error('Method not supported by Alexa API.');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public async continueConversation(reference: Partial<ConversationReference>, logic: (context: TurnContext) => Promise<void>): Promise<void> {
-        throw new Error('Method not supported by Alexa API.');
+        const request: Partial<Activity> = TurnContext.applyConversationReference(
+            { type: 'event', name: 'continueConversation' },
+            reference,
+            true
+        );
+
+        const context: TurnContext = this.createContext(request);
+
+        return this.runMiddleware(context, logic);
     }
 
     /**
@@ -254,7 +157,7 @@ export class AlexaAdapter extends BotAdapter {
      */
     public async processActivity(req: WebRequest, res: WebResponse, logic: (context: TurnContext) => Promise<any>): Promise<void> {
 
-        // Validate if request is coming from Alexa
+        // Validate if request contains Alexa Signature
         if (this.settings.validateIncomingAlexaRequests) {
             if (!req.headers && (!req.headers['signature'] || !req.headers['Signature'])) {
                 console.warn(`AlexaAdapter.processActivity(): request doesn't contain an Alexa Signature.`);
@@ -280,7 +183,7 @@ export class AlexaAdapter extends BotAdapter {
             }
         }
 
-        const activity = this.requestToActivity(alexaRequestBody);
+        const activity = AlexaMessageMapper.alexaRequestToActivity(alexaRequestBody);
 
         // Create a Conversation Reference
         const context: TurnContext = this.createContext(activity);
@@ -339,6 +242,7 @@ function retrieveBody(req: WebRequest): Promise<any> {
     });
 }
 
+// TODO use CustomWebAdapter
 // Copied from `botFrameworkAdapter.ts` to support {type: 'delay' } activity.
 function delay(timeout: number): Promise<void> {
     return new Promise((resolve): void => {

@@ -1,4 +1,4 @@
-import { AlexaActivityTypes } from './../alexaAdapter';
+import { AlexaActivityTypes } from '../alexaSchema';
 import { Middleware, TurnContext } from 'botbuilder';
 import { RequestEnvelope } from 'ask-sdk-model';
 import { getSlotValue } from 'ask-sdk-core';
