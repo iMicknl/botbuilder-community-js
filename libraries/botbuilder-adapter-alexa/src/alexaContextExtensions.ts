@@ -17,7 +17,7 @@ export class AlexaContextExtensions {
 
     public static deviceHasDisplay(context: TurnContext): boolean {
         const alexaRequest = context.activity.channelData;
-        const hasDisplay = alexaRequest?.Context?.System?.Device?.SupportedInterfaces?.ContainsKey("Display");
+        const hasDisplay = alexaRequest?.Context?.System?.Device?.SupportedInterfaces?.ContainsKey('Display');
 
         return hasDisplay.HasValue && hasDisplay.Value;
     }
