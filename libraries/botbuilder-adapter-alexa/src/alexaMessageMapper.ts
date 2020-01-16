@@ -44,7 +44,7 @@ export class AlexaMessageMapper {
             channelData: alexaRequestBody,
             localTimezone: null,
             callerId: null,
-            serviceUrl: `${system.apiEndpoint}?token=${getApiAccessToken(alexaRequestBody)}`,
+            serviceUrl: `${ system.apiEndpoint }?token=${ getApiAccessToken(alexaRequestBody) }`,
             listenFor: null,
             label: null,
             valueType: null,
@@ -90,7 +90,7 @@ export class AlexaMessageMapper {
         // Add SSML or text response
         if (activity.speak) {
             if (!activity.speak.startsWith('<speak>') && !activity.speak.endsWith('</speak>')) {
-                activity.speak = `<speak>${escapeXmlCharacters(activity.speak)}</speak>`;
+                activity.speak = `<speak>${ escapeXmlCharacters(activity.speak) }</speak>`;
             }
 
             response.outputSpeech = {
