@@ -1,6 +1,6 @@
 import { AlexaActivityTypes } from './alexaSchema';
 import { AlexaAdapter } from './alexaAdapter';
-import { RequestEnvelope, Response, ResponseEnvelope, interfaces as AlexaInterfaces } from 'ask-sdk-model';
+import { RequestEnvelope, Response, ResponseEnvelope, interfaces as AlexaInterfaces, ui as AlexaUI } from 'ask-sdk-model';
 import { Activity, TurnContext, InputHints, ActivityTypes } from 'botbuilder';
 import { escapeXmlCharacters, getLocale, getUserId, getIntentName, getRequestType, getApiAccessToken } from 'ask-sdk-core';
 
@@ -108,16 +108,12 @@ export class AlexaMessageMapper {
 
         // TODO: Handle cards
         // TODO: Handle attachments
-
-
         if (context.activity?.attachments) {
 
-            // Check attachment type
-
-            // Convert HeroCard to StandardCard
-
+            const card = this.attachmentsToAlexaCards(context);
+      
             // Map to Alexa types
-            response.card = null;
+            response.card = card;
         }
 
 
@@ -139,6 +135,30 @@ export class AlexaMessageMapper {
         }
 
         return response;
+    }
+
+    /**
+     * Convert attachment to Alexa Card
+     * @param context TurnContext
+     */
+    public static attachmentsToAlexaCards(context: TurnContext): AlexaUI.Card {
+
+
+        // Check attachment type
+
+        // Convert HeroCard to StandardCard
+
+
+        // Transform HeroCard + ThumbnailCard
+        if (context.activity.attachments[0]) {
+            // Get type
+        }
+
+        // Transform SignInCard to LinkAccount Card
+
+        // Parse native cards
+
+        return { 'type': 'Standard' };
     }
 
 }
