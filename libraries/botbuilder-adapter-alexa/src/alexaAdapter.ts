@@ -1,7 +1,8 @@
+import { AppCredentials } from 'botframework-connector';
 import { CustomWebAdapter } from '@botbuildercommunity/core';
 import { AlexaContextExtensions } from './alexaContextExtensions';
 import { AlexaMessageMapper } from './alexaMessageMapper';
-import { Activity, ActivityTypes, BotAdapter, TurnContext, ConversationReference, ResourceResponse, WebRequest, WebResponse } from 'botbuilder';
+import { Activity, ActivityTypes, TurnContext, ConversationReference, ResourceResponse, WebRequest, WebResponse, TokenResponse } from 'botbuilder';
 import { RequestEnvelope, ResponseEnvelope } from 'ask-sdk-model';
 import { SkillRequestSignatureVerifier, TimestampVerifier } from 'ask-sdk-express-adapter';
 
@@ -231,6 +232,52 @@ export class AlexaAdapter extends CustomWebAdapter {
      */
     protected createContext(request: Partial<Activity>): TurnContext {
         return new TurnContext(this as any, request);
+    }
+
+    /**
+     * Asynchronously attempts to retrieve the token for a user that's in a login flow.
+     * 
+     * @param context The context object for the turn.
+     * @param connectionName The name of the auth connection to use.
+     * @param magicCode Optional. The validation code the user entered.
+     * @param oAuthAppCredentials AppCredentials for OAuth.
+     * 
+     * @returns A [TokenResponse](xref:botframework-schema.TokenResponse) object that contains the user token.
+     */
+    public async getUserToken(context: TurnContext, connectionName?: string, magicCode?: string): Promise<TokenResponse>;
+    public async getUserToken(context: TurnContext, connectionName?: string, magicCode?: string, oAuthAppCredentials?: AppCredentials): Promise<TokenResponse>;
+    public async getUserToken(context: TurnContext, connectionName?: string, magicCode?: string, oAuthAppCredentials?: AppCredentials): Promise<TokenResponse> {
+        if (!context.activity.from || !context.activity.from.id) {
+            throw new Error(`CustomWebAdapter.getUserToken(): missing from or from.id`);
+        }
+   
+        // Retrieve Alexa OAuth token from context
+        const alexaBody = AlexaContextExtensions.getAlexaRequestBody(context);
+
+        const result: TokenResponse = {
+            connectionName: 'AlexaAccountLinking',
+            expiration: undefined,
+            token: alexaBody.session.user.accessToken
+        }
+       
+        if (!result || !result.token) {
+            return undefined;
+        } else {
+            return result as TokenResponse;
+        }
+    }
+
+    /**
+     * Asynchronously signs out the user from the token server.
+     * 
+     * @param context The context object for the turn.
+     * @param connectionName The name of the auth connection to use.
+     * @param userId The ID of user to sign out.
+     * @param oAuthAppCredentials AppCredentials for OAuth.
+     */
+    public async signOutUser(context: TurnContext, connectionName?: string, userId?: string): Promise<void>;
+    public async signOutUser(context: TurnContext, connectionName?: string, userId?: string, oAuthAppCredentials?: AppCredentials): Promise<void> {
+        throw new Error('Method not supported by Alexa API.');
     }
 
 }
