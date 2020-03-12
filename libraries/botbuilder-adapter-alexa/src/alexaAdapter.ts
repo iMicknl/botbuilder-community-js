@@ -1,3 +1,4 @@
+import { CustomWebAdapter } from '@botbuildercommunity/core';
 import { AlexaContextExtensions } from './alexaContextExtensions';
 import { AlexaMessageMapper } from './alexaMessageMapper';
 import { Activity, ActivityTypes, BotAdapter, TurnContext, ConversationReference, ResourceResponse, WebRequest, WebResponse } from 'botbuilder';
@@ -34,7 +35,7 @@ export interface AlexaAdapterSettings {
 /**
  * Bot Framework Adapter for Alexa
  */
-export class AlexaAdapter extends BotAdapter {
+export class AlexaAdapter extends CustomWebAdapter {
 
     public static readonly channel: string = 'alexa';
 
@@ -190,7 +191,7 @@ export class AlexaAdapter extends BotAdapter {
      */
     public async processActivity(req: WebRequest, res: WebResponse, logic: (context: TurnContext) => Promise<any>): Promise<void> {
 
-        const alexaRequestBody: RequestEnvelope = await retrieveBody(req);
+        const alexaRequestBody: RequestEnvelope = await this.retrieveBody(req);
 
         if (this.settings.validateIncomingAlexaRequests) {
             // Verify if request is a valid request from Alexa
@@ -232,36 +233,4 @@ export class AlexaAdapter extends BotAdapter {
         return new TurnContext(this as any, request);
     }
 
-}
-
-/**
- * Retrieve body from WebRequest
- * @private
- * @param req incoming web request
- */
-function retrieveBody(req: WebRequest): Promise<any> {
-    return new Promise((resolve: any, reject: any): void => {
-
-        if (req.body) {
-            try {
-                resolve(req.body);
-            } catch (err) {
-                reject(err);
-            }
-        } else {
-            let requestData = '';
-            req.on('data', (chunk: string): void => {
-                requestData += chunk;
-            });
-            req.on('end', (): void => {
-                try {
-                    req.body = JSON.parse(requestData);
-
-                    resolve(req.body);
-                } catch (err) {
-                    reject(err);
-                }
-            });
-        }
-    });
 }

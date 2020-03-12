@@ -55,10 +55,11 @@
   },
   "homepage": "https://github.com/BotBuilderCommunity/botbuilder-community-js#readme",
   "dependencies": {
+    "@botbuildercommunity/core": "file:../botbuilder-core",
     "ask-sdk-core": "^2.7.0",
     "ask-sdk-express-adapter": "^2.0.1",
     "ask-sdk-model": "^1.26.0",
-    "botbuilder": "^4.7.2",
+    "botbuilder": "^4.8.0-rc0",
     "node-fetch": "^2.6.0"
   },
   "devDependencies": {
