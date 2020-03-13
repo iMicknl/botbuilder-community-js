@@ -258,7 +258,7 @@ export class AlexaAdapter extends CustomWebAdapter {
             connectionName: 'AlexaAccountLinking',
             expiration: undefined,
             token: alexaBody.session.user.accessToken
-        }
+        };
        
         if (!result || !result.token) {
             return undefined;
