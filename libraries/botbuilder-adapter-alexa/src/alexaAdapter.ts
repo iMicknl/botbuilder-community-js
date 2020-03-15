@@ -1,4 +1,4 @@
-import { AppCredentials } from 'botframework-connector';
+import { AppCredentials, TokenStatus } from 'botframework-connector';
 import { CustomWebAdapter } from '@botbuildercommunity/core';
 import { AlexaContextExtensions } from './alexaContextExtensions';
 import { AlexaMessageMapper } from './alexaMessageMapper';
@@ -250,21 +250,50 @@ export class AlexaAdapter extends CustomWebAdapter {
         if (!context.activity.from || !context.activity.from.id) {
             throw new Error(`CustomWebAdapter.getUserToken(): missing from or from.id`);
         }
-   
+
         // Retrieve Alexa OAuth token from context
         const alexaBody = AlexaContextExtensions.getAlexaRequestBody(context);
 
-        const result: TokenResponse = {
+        const result: Partial<TokenResponse> = {
             connectionName: 'AlexaAccountLinking',
-            expiration: undefined,
-            token: alexaBody.session.user.accessToken
+            token: alexaBody.session?.user?.accessToken
         };
-       
+
         if (!result || !result.token) {
             return undefined;
         } else {
             return result as TokenResponse;
         }
+    }
+
+    /** 
+     * Asynchronously retrieves the token status for each configured connection for the given user.
+     * 
+     * @param context The context object for the turn.
+     * @param userId Optional. If present, the ID of the user to retrieve the token status for.
+     *      Otherwise, the ID of the user who sent the current activity is used.
+     * @param includeFilter Optional. A comma-separated list of connection's to include. If present,
+     *      the `includeFilter` parameter limits the tokens this method returns.
+     * @param oAuthAppCredentials AppCredentials for OAuth.
+     * 
+     * @returns The [TokenStatus](xref:botframework-connector.TokenStatus) objects retrieved.
+     */
+    public async getTokenStatus(context: TurnContext, userId?: string, includeFilter?: string): Promise<TokenStatus[]>;
+    public async getTokenStatus(context: TurnContext, userId?: string, includeFilter?: string, oAuthAppCredentials?: AppCredentials): Promise<TokenStatus[]>;
+    public async getTokenStatus(context: TurnContext, userId?: string, includeFilter?: string, oAuthAppCredentials?: AppCredentials): Promise<TokenStatus[]> {
+        if (!userId && (!context.activity.from || !context.activity.from.id)) {
+            throw new Error(`CustomWebAdapter.getTokenStatus(): missing from or from.id`);
+        }
+
+        // Retrieve Alexa OAuth token from context
+        const alexaBody = AlexaContextExtensions.getAlexaRequestBody(context);
+        const token = alexaBody.session?.user?.accessToken;
+
+        const tokenStatus: Partial<TokenStatus> = {
+            hasToken: (token ? true : false)
+        };
+
+        return [tokenStatus];
     }
 
     /**
@@ -278,6 +307,25 @@ export class AlexaAdapter extends CustomWebAdapter {
     public async signOutUser(context: TurnContext, connectionName?: string, userId?: string): Promise<void>;
     public async signOutUser(context: TurnContext, connectionName?: string, userId?: string, oAuthAppCredentials?: AppCredentials): Promise<void> {
         throw new Error('Method not supported by Alexa API.');
+    }
+
+    /**
+     * Asynchronously gets a sign-in link from the token server that can be sent as part
+     * of a [SigninCard](xref:botframework-schema.SigninCard).
+     * 
+     * @param context The context object for the turn.
+     * @param connectionName The name of the auth connection to use.
+     * @param oAuthAppCredentials AppCredentials for OAuth.
+     * @param userId The user id that will be associated with the token.
+     * @param finalRedirect The final URL that the OAuth flow will redirect to.
+     */
+    public async getSignInLink(context: TurnContext, connectionName: string, oAuthAppCredentials?: AppCredentials, userId?: string, finalRedirect?: string): Promise<string> {
+        if (userId && userId != context.activity.from.id) {
+            throw new ReferenceError(`cannot retrieve OAuth signin link for a user that's different from the conversation`);
+        }
+
+        // Send empty string back to not break SignInCard 
+        return '';
     }
 
 }

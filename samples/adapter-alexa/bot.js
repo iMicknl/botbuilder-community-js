@@ -18,6 +18,17 @@ class EchoBot extends ActivityHandler {
 
             switch (context.activity.text) {
                 // Progressive response
+                case 'account':
+                    await context.sendActivity({
+                        text: ` Before I can do x, you need to log in with your Microsoft account. Please visit the Alexa app to link your Microsoft account. !`,
+                        attachments: [
+                            AlexaCardFactory.linkAccountCard()
+                        ],
+                        inputHint: InputHints.ExpectingInput
+                    });
+
+                    break;
+
                 case 'progressive':
                     await AlexaContextExtensions.sendProgressiveResponse(context, 'This is a progressive response. Please wait while we are retrieving your results.');
                     await context.sendActivity('Here is your result!');
